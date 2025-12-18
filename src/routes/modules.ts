@@ -68,5 +68,20 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
     res.status(500).json({ error: String(error) })
   }
 })
+// Add this route at the bottom, before export default router
+router.get('/schema', async (req, res) => {
+  try {
+    const response = await fetch('https://app.smartsuite.com/api/v1/applications/69441e0e081da2e01f4d9a78/', {
+      headers: {
+        'Authorization': `Token ${process.env.SMARTSUITE_API_KEY}`,
+        'Account-Id': 'sba974gi'
+      }
+    })
+    const data = await response.json()
+    res.json(data)
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
 
 export default router
