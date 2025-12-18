@@ -3,7 +3,7 @@ const WORKSPACE_ID = 'sba974gi'
 const BASE_URL = 'https://app.smartsuite.com/api/v1/applications'
 
 const TABLES = {
-  modules: '69441e0f081da2e01f4d9a',
+  modules: '69441e0f081da2e01f4d9a79',
   workers: '69441f0eeb5683351ec55a90',
   verifications: '69441fd3d9350cee4e1b8e3f',
   audit_logs: '694440eb0dc34459d50511ce'
