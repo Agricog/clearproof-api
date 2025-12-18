@@ -31,7 +31,8 @@ router.post('/transform/:moduleId', requireAuth(), processLimiter, async (req, r
       action: 'process.transform',
       resource: 'modules',
       resourceId: req.params.moduleId,
-      ip: req.ip || null
+      ip: req.ip || null,
+      details: {}
     })
 
     res.json({ success: true, processed })
@@ -44,14 +45,13 @@ router.post('/transform/:moduleId', requireAuth(), processLimiter, async (req, r
 router.post('/translate', validate(translateSchema), processLimiter, async (req, res) => {
   try {
     const { content, language } = req.body
-
     const translated = await translateContent(content, language)
 
     await logAudit({
       userId: null,
       action: 'process.translate',
       resource: 'translation',
-      resourceId: null,
+      resourceId: 'n/a',
       ip: req.ip || null,
       details: { language }
     })
@@ -66,7 +66,6 @@ router.post('/translate', validate(translateSchema), processLimiter, async (req,
 router.post('/questions', validate(questionsSchema), processLimiter, async (req, res) => {
   try {
     const { content, language = 'en' } = req.body
-
     const questions = await generateQuestions(content, language)
     res.json({ questions })
   } catch (error) {
@@ -76,3 +75,4 @@ router.post('/questions', validate(questionsSchema), processLimiter, async (req,
 })
 
 export default router
+
