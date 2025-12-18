@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3001
 const allowedOrigins = [
   'http://localhost:5173',
   'https://clearproof.co.uk',
-  'https://clearproof-production.up.railway.app'
+  'https://www.clearproof.co.uk'
 ]
 
 app.use(cors({
