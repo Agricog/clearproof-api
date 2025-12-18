@@ -28,8 +28,10 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) => {
   try {
+    console.log('Creating module with:', JSON.stringify(req.body, null, 2))
     const userId = getUserId(req)
     const data = await createRecord('modules', req.body)
+    console.log('Module created:', data)
 
     await logAudit({
       userId,
@@ -42,6 +44,7 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
 
     res.json(data)
   } catch (error) {
+    console.error('Module create error:', error)
     res.status(500).json({ error: String(error) })
   }
 })
