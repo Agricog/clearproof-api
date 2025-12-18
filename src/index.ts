@@ -1,5 +1,7 @@
 import express from 'express'
 import cors from 'cors'
+import { clerkMiddleware } from '@clerk/express'
+import { generalLimiter } from './middleware/rateLimit.js'
 import modulesRouter from './routes/modules.js'
 import workersRouter from './routes/workers.js'
 import verificationsRouter from './routes/verifications.js'
@@ -8,8 +10,28 @@ import processRouter from './routes/process.js'
 const app = express()
 const PORT = process.env.PORT || 3001
 
-app.use(cors())
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://clearproof.co.uk',
+  'https://clearproof-production.up.railway.app'
+]
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true
+}))
+
 app.use(express.json({ limit: '10mb' }))
+app.use(clerkMiddleware())
+app.use(generalLimiter)
+
+app.set('trust proxy', 1)
 
 app.use('/api/modules', modulesRouter)
 app.use('/api/workers', workersRouter)
@@ -18,6 +40,11 @@ app.use('/api/process', processRouter)
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })
+})
+
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled error:', err)
+  res.status(500).json({ error: 'Internal server error' })
 })
 
 app.listen(PORT, () => {
