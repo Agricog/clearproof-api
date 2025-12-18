@@ -6,7 +6,7 @@ const TABLES = {
   modules: '69441e0e081da2e01f4d9a78',
   workers: '69441f0deb5683351ec55a8f',
   verifications: '69441fd3d9350cee4e1b8e3e',
-  audit_logs: '694440eb0dc34459d50511cd'  // also needs updating - middle segment
+  audit_logs: '694440eb0dc34459d50511cd'
 }
 
 async function request(endpoint: string, options: RequestInit = {}) {
