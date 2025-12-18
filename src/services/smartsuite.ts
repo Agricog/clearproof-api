@@ -10,7 +10,10 @@ const TABLES = {
 }
 
 async function request(endpoint: string, options: RequestInit = {}) {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const url = `${BASE_URL}${endpoint}`
+  console.log('SmartSuite request:', url)
+  
+  const res = await fetch(url, {
     ...options,
     headers: {
       'Authorization': `Token ${API_KEY}`,
@@ -22,6 +25,7 @@ async function request(endpoint: string, options: RequestInit = {}) {
 
   if (!res.ok) {
     const error = await res.text()
+    console.log('SmartSuite error response:', error)
     throw new Error(`SmartSuite API error: ${res.status} ${error}`)
   }
 
