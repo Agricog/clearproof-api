@@ -30,6 +30,15 @@ async function chat(messages: Message[], system?: string) {
   return data.content[0].text
 }
 
+function stripCodeBlocks(text: string): string {
+  // Remove markdown code blocks if present
+  return text
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
+}
+
 export async function transformContent(rawContent: string): Promise<string> {
   const system = `You are a Health & Safety content specialist. Your job is to transform complex H&S documents into clear, simple sections that workers can easily understand.
 
@@ -39,11 +48,14 @@ Rules:
 - Use bullet points for lists of requirements
 - Highlight critical safety points
 - Remove legal jargon, keep practical information
-- Output as JSON with structure: { "sections": [{ "title": string, "content": string, "critical": boolean }] }`
+- Output ONLY valid JSON with structure: { "sections": [{ "title": string, "content": string, "critical": boolean }] }
+- Do NOT wrap in markdown code blocks`
 
-  return chat([
+  const result = await chat([
     { role: 'user', content: `Transform this H&S document into clear, worker-friendly sections:\n\n${rawContent}` }
   ], system)
+
+  return stripCodeBlocks(result)
 }
 
 export async function translateContent(content: string, targetLanguage: string): Promise<string> {
@@ -63,11 +75,14 @@ Rules:
 - Multiple choice with 3 options
 - One clearly correct answer based on the content
 - Questions should test understanding, not memory
-- Output as JSON: { "questions": [{ "scenario": string, "question": string, "options": string[], "correctIndex": number }] }`
+- Output ONLY valid JSON: { "questions": [{ "scenario": string, "question": string, "options": string[], "correctIndex": number }] }
+- Do NOT wrap in markdown code blocks`
 
   const languageInstruction = language !== 'en' ? ` Output the questions in ${language}.` : ''
 
-  return chat([
+  const result = await chat([
     { role: 'user', content: `Based on this H&S content, create scenario-based comprehension questions.${languageInstruction}\n\n${content}` }
   ], system)
+
+  return stripCodeBlocks(result)
 }
