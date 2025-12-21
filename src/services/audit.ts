@@ -30,8 +30,7 @@ export async function logAudit(entry: {
 }) {
   try {
     await createRecord('audit_logs', {
-      title: `${entry.action} - ${entry.resource}`,  // Add this line
-      timestamp: new Date().toISOString(),
+      title: `${entry.action} - ${entry.resourceId} - ${Date.now()}`,
       user_id: entry.userId,
       action: entry.action,
       resource: entry.resource,
