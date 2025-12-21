@@ -15,11 +15,11 @@ router.post('/transform/:moduleId', requireAuth(), processLimiter, async (req, r
     const userId = getUserId(req)
     const module = await getRecord('modules', req.params.moduleId)
     
-    if (!module.original_content) {
+    if (!module.sbd46df988) {
       return res.status(400).json({ error: 'No content to process' })
     }
 
-    const processed = await transformContent(module.original_content)
+    const processed = await transformContent(module.sbd46df988)
     
     await updateRecord('modules', req.params.moduleId, {
       processed_content: processed,
