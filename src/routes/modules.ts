@@ -8,6 +8,15 @@ import { getUserId } from '../middleware/auth.js'
 
 const router = Router()
 
+// Field ID mapping
+const FIELDS = {
+  original_content: 'sbd46df988',
+  processed_content: 'sde7e5250a',
+  questions: 'sceb501715',
+  qr_code: 's4ad3aec2f',
+  created_on: 'sc8d4acbb6'
+}
+
 router.get('/', requireAuth(), async (req, res) => {
   try {
     const data = await getRecords('modules')
@@ -28,11 +37,22 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) => {
   try {
-    console.log('Creating module with:', JSON.stringify(req.body, null, 2))
     const userId = getUserId(req)
-    const data = await createRecord('modules', req.body)
+    
+    // Map to SmartSuite field IDs
+    const record = {
+      title: req.body.title,
+      [FIELDS.original_content]: req.body.original_content || '',
+      [FIELDS.processed_content]: req.body.processed_content || '',
+      [FIELDS.questions]: req.body.questions || '',
+      [FIELDS.qr_code]: req.body.qr_code || '',
+      status: { value: 'backlog', updated_on: null }
+    }
+    
+    console.log('Creating module with:', JSON.stringify(record, null, 2))
+    const data = await createRecord('modules', record)
     console.log('Module created:', data)
-
+    
     await logAudit({
       userId,
       action: 'module.create',
@@ -41,7 +61,7 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
       ip: req.ip || null,
       details: { title: req.body.title }
     })
-
+    
     res.json(data)
   } catch (error) {
     console.error('Module create error:', error)
@@ -52,8 +72,18 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
 router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, res) => {
   try {
     const userId = getUserId(req)
-    const data = await updateRecord('modules', req.params.id, req.body)
-
+    
+    // Map fields to SmartSuite IDs
+    const record: Record<string, unknown> = {}
+    if (req.body.title) record.title = req.body.title
+    if (req.body.original_content) record[FIELDS.original_content] = req.body.original_content
+    if (req.body.processed_content) record[FIELDS.processed_content] = req.body.processed_content
+    if (req.body.questions) record[FIELDS.questions] = req.body.questions
+    if (req.body.qr_code) record[FIELDS.qr_code] = req.body.qr_code
+    if (req.body.status) record.status = { value: req.body.status, updated_on: null }
+    
+    const data = await updateRecord('modules', req.params.id, record)
+    
     await logAudit({
       userId,
       action: 'module.update',
@@ -62,22 +92,7 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
       ip: req.ip || null,
       details: req.body
     })
-
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ error: String(error) })
-  }
-})
-// Add this route at the bottom, before export default router
-router.get('/schema', async (req, res) => {
-  try {
-    const response = await fetch('https://app.smartsuite.com/api/v1/applications/69441e0e081da2e01f4d9a78/', {
-      headers: {
-        'Authorization': `Token ${process.env.SMARTSUITE_API_KEY}`,
-        'Account-Id': 'sba974gi'
-      }
-    })
-    const data = await response.json()
+    
     res.json(data)
   } catch (error) {
     res.status(500).json({ error: String(error) })
