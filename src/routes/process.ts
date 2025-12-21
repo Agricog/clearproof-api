@@ -10,20 +10,30 @@ import { processLimiter } from '../middleware/rateLimit.js'
 
 const router = Router()
 
+// Module field IDs
+const MODULE_FIELDS = {
+  original_content: 'sbd46df988',
+  processed_content: 'sde7e5250a',
+  questions: 'sceb501715',
+  qr_code: 's4ad3aec2f'
+}
+
 router.post('/transform/:moduleId', requireAuth(), processLimiter, async (req, res) => {
   try {
     const userId = getUserId(req)
     const module = await getRecord('modules', req.params.moduleId)
     
-    if (!module.sbd46df988) {
+    if (!module[MODULE_FIELDS.original_content]) {
       return res.status(400).json({ error: 'No content to process' })
     }
 
-    const processed = await transformContent(module.sbd46df988)
+    const processed = await transformContent(module[MODULE_FIELDS.original_content])
+    const questions = await generateQuestions(processed, 'en')
     
     await updateRecord('modules', req.params.moduleId, {
-      processed_content: processed,
-      status: 'ready'
+      [MODULE_FIELDS.processed_content]: processed,
+      [MODULE_FIELDS.questions]: JSON.stringify(questions),
+      status: { value: 'complete', updated_on: null }
     })
 
     await logAudit({
