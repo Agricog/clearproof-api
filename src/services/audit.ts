@@ -1,23 +1,12 @@
 import { createRecord } from './smartsuite.js'
 
-export type AuditAction =
-  | 'module.create'
-  | 'module.update'
-  | 'module.delete'
-  | 'verification.create'
-  | 'worker.create'
-  | 'process.transform'
-  | 'process.translate'
-  | 'auth.login'
-  | 'auth.logout'
-
-interface AuditEntry {
-  userId: string | null
-  action: AuditAction
-  resource: string
-  resourceId: string | null
-  ip: string | null
-  details?: Record<string, unknown>
+const AUDIT_FIELDS = {
+  user_id: 'sd4400df5f',
+  action: 's2fbf046cb',
+  resource: 'se5c4b6aa6',
+  resource_id: 'sf3515c7f5',
+  ip_address: 's7d26da42e',
+  details: 's0b9cb63d0'
 }
 
 export async function logAudit(entry: {
@@ -31,12 +20,12 @@ export async function logAudit(entry: {
   try {
     await createRecord('audit_logs', {
       title: `${entry.action} - ${entry.resourceId} - ${Date.now()}`,
-      user_id: entry.userId,
-      action: entry.action,
-      resource: entry.resource,
-      resource_id: entry.resourceId,
-      ip_address: entry.ip,
-      details: JSON.stringify(entry.details)
+      [AUDIT_FIELDS.user_id]: entry.userId || '',
+      [AUDIT_FIELDS.action]: entry.action,
+      [AUDIT_FIELDS.resource]: entry.resource,
+      [AUDIT_FIELDS.resource_id]: entry.resourceId,
+      [AUDIT_FIELDS.ip_address]: entry.ip || '',
+      [AUDIT_FIELDS.details]: JSON.stringify(entry.details)
     })
   } catch (error) {
     console.error('Failed to log audit entry:', error)
