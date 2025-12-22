@@ -74,6 +74,7 @@ Rules:
 - Use realistic workplace scenarios
 - Multiple choice with 3 options
 - One clearly correct answer based on the content
+- IMPORTANT: Randomize the position of correct answers - do NOT put all correct answers in the same position. Mix them up so correctIndex varies between 0, 1, and 2 across questions.
 - Questions should test understanding, not memory
 - Output ONLY valid JSON: { "questions": [{ "scenario": string, "question": string, "options": string[], "correctIndex": number }] }
 - Do NOT wrap in markdown code blocks`
@@ -81,7 +82,7 @@ Rules:
   const languageInstruction = language !== 'en' ? ` Output the questions in ${language}.` : ''
 
   const result = await chat([
-    { role: 'user', content: `Based on this H&S content, create scenario-based comprehension questions.${languageInstruction}\n\n${content}` }
+    { role: 'user', content: `Based on this H&S content, create scenario-based comprehension questions. Make sure the correctIndex values are randomized (not all the same number).${languageInstruction}\n\n${content}` }
   ], system)
 
   return stripCodeBlocks(result)
