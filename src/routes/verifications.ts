@@ -59,7 +59,34 @@ const WORKER_LANG_IDS: Record<string, string> = {
 router.get('/', requireAuth(), async (req, res) => {
   try {
     const data = await getRecords('verifications')
-    res.json(data)
+    
+    // Fetch all modules and workers for name resolution
+    const [modulesData, workersData] = await Promise.all([
+      getRecords('modules'),
+      getRecords('workers')
+    ])
+    
+    const modulesMap = new Map(modulesData.items?.map((m: { id: string; title: string }) => [m.id, m.title]) || [])
+    const workersMap = new Map(workersData.items?.map((w: { id: string; title: string }) => [w.id, w.title]) || [])
+    
+    // Map to friendly field names
+    const items = (data.items || []).map((v: Record<string, unknown>) => {
+      const moduleIds = v[VERIFICATION_FIELDS.module] as string[] || []
+      const workerIds = v[VERIFICATION_FIELDS.worker] as string[] || []
+      const completedAt = v[VERIFICATION_FIELDS.completed_at] as { date?: string } | null
+      const passed = v[VERIFICATION_FIELDS.passed] as Record<string, unknown> | null
+      
+      return {
+        id: v.id,
+        worker_name: workerIds[0] ? workersMap.get(workerIds[0]) || 'Unknown' : 'Unknown',
+        module_title: moduleIds[0] ? modulesMap.get(moduleIds[0]) || 'Unknown' : 'Unknown',
+        completed_at: completedAt?.date || '',
+        score: v[VERIFICATION_FIELDS.score] || 0,
+        passed: passed ? Object.keys(passed).length > 0 : false
+      }
+    })
+    
+    res.json({ items })
   } catch (error) {
     res.status(500).json({ error: String(error) })
   }
