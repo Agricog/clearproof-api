@@ -45,13 +45,22 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
       [FIELDS.original_content]: req.body.original_content || '',
       [FIELDS.processed_content]: req.body.processed_content || '',
       [FIELDS.questions]: req.body.questions || '',
-      [FIELDS.qr_code]: req.body.qr_code || '',
-      status: { value: 'backlog', updated_on: null }
+      [FIELDS.qr_code]: '',
+      [FIELDS.created_on]: {
+        date: new Date().toISOString(),
+        include_time: true
+      },
+      status: { value: 'processing', updated_on: null }
     }
     
     console.log('Creating module with:', JSON.stringify(record, null, 2))
     const data = await createRecord('modules', record)
     console.log('Module created:', data)
+
+    // Update with QR code URL
+    await updateRecord('modules', data.id, {
+      [FIELDS.qr_code]: `https://clearproof.co.uk/verify/${data.id}`
+    })
     
     await logAudit({
       userId,
