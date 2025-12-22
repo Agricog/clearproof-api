@@ -11,6 +11,8 @@ import { getUserId } from '../middleware/auth.js'
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
+const MAX_CONTENT_LENGTH = 100000
+
 // Field ID mapping
 const FIELDS = {
   original_content: 'sbd46df988',
@@ -39,9 +41,12 @@ router.post('/upload', requireAuth(), upload.single('file'), async (req, res) =>
       return res.status(400).json({ error: 'Unsupported file type. Use .txt or .pdf' })
     }
 
-    // Truncate to SmartSuite's 120k character limit
     const trimmed = content.trim()
-    const truncated = trimmed.length > 115000 ? trimmed.substring(0, 115000) + '\n\n[Content truncated]' : trimmed
+    const truncated = trimmed.length > MAX_CONTENT_LENGTH 
+      ? trimmed.substring(0, MAX_CONTENT_LENGTH) + '\n\n[Content truncated]' 
+      : trimmed
+
+    console.log(`File parsed: ${trimmed.length} chars, truncated to: ${truncated.length} chars`)
 
     res.json({ 
       filename: originalname,
@@ -75,10 +80,16 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
   try {
     const userId = getUserId(req)
     
+    // Truncate content to SmartSuite's limit
+    let originalContent = req.body.original_content || ''
+    if (originalContent.length > MAX_CONTENT_LENGTH) {
+      originalContent = originalContent.substring(0, MAX_CONTENT_LENGTH) + '\n\n[Content truncated]'
+    }
+    
     // Map to SmartSuite field IDs
     const record = {
       title: req.body.title,
-      [FIELDS.original_content]: req.body.original_content || '',
+      [FIELDS.original_content]: originalContent,
       [FIELDS.processed_content]: req.body.processed_content || '',
       [FIELDS.questions]: req.body.questions || '',
       [FIELDS.qr_code]: '',
@@ -89,9 +100,9 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
       status: { value: 'processing', updated_on: null }
     }
     
-    console.log('Creating module with:', JSON.stringify(record, null, 2))
+    console.log('Creating module, content length:', originalContent.length)
     const data = await createRecord('modules', record)
-    console.log('Module created:', data)
+    console.log('Module created:', data.id)
     
     // Update with QR code URL
     await updateRecord('modules', data.id, {
@@ -121,7 +132,13 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
     // Map fields to SmartSuite IDs
     const record: Record<string, unknown> = {}
     if (req.body.title) record.title = req.body.title
-    if (req.body.original_content) record[FIELDS.original_content] = req.body.original_content
+    if (req.body.original_content) {
+      let content = req.body.original_content
+      if (content.length > MAX_CONTENT_LENGTH) {
+        content = content.substring(0, MAX_CONTENT_LENGTH) + '\n\n[Content truncated]'
+      }
+      record[FIELDS.original_content] = content
+    }
     if (req.body.processed_content) record[FIELDS.processed_content] = req.body.processed_content
     if (req.body.questions) record[FIELDS.questions] = req.body.questions
     if (req.body.qr_code) record[FIELDS.qr_code] = req.body.qr_code
