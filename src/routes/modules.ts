@@ -39,9 +39,13 @@ router.post('/upload', requireAuth(), upload.single('file'), async (req, res) =>
       return res.status(400).json({ error: 'Unsupported file type. Use .txt or .pdf' })
     }
 
+    // Truncate to SmartSuite's 120k character limit
+    const trimmed = content.trim()
+    const truncated = trimmed.length > 115000 ? trimmed.substring(0, 115000) + '\n\n[Content truncated]' : trimmed
+
     res.json({ 
       filename: originalname,
-      content: content.trim()
+      content: truncated
     })
   } catch (error) {
     console.error('File upload error:', error)
