@@ -3,7 +3,7 @@ import { requireAuth } from '@clerk/express'
 import multer from 'multer'
 import pdf from 'pdf-parse'
 import QRCode from 'qrcode'
-import { getRecords, getRecord, createRecord, updateRecord } from '../services/smartsuite.js'
+import { getRecords, getRecord, createRecord, updateRecord, deleteRecord } from '../services/smartsuite.js'
 import { logAudit } from '../services/audit.js'
 import { validate } from '../middleware/validate.js'
 import { createModuleSchema, updateModuleSchema } from '../schemas/index.js'
@@ -190,6 +190,31 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
     
     res.json(data)
   } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+router.delete('/:id', requireAuth(), async (req, res) => {
+  try {
+    const userId = getUserId(req)
+    
+    // Get module title for audit log before deleting
+    const module = await getRecord('modules', req.params.id)
+    
+    await deleteRecord('modules', req.params.id)
+    
+    await logAudit({
+      userId,
+      action: 'module.delete',
+      resource: 'modules',
+      resourceId: req.params.id,
+      ip: req.ip || null,
+      details: { title: module.title }
+    })
+    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Module delete error:', error)
     res.status(500).json({ error: String(error) })
   }
 })
