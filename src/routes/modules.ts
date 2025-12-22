@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '@clerk/express'
+import multer from 'multer'
+import pdf from 'pdf-parse'
 import { getRecords, getRecord, createRecord, updateRecord } from '../services/smartsuite.js'
 import { logAudit } from '../services/audit.js'
 import { validate } from '../middleware/validate.js'
@@ -7,6 +9,7 @@ import { createModuleSchema, updateModuleSchema } from '../schemas/index.js'
 import { getUserId } from '../middleware/auth.js'
 
 const router = Router()
+const upload = multer({ storage: multer.memoryStorage() })
 
 // Field ID mapping
 const FIELDS = {
@@ -16,6 +19,35 @@ const FIELDS = {
   qr_code: 's4ad3aec2f',
   created_on: 'sc8d4acbb6'
 }
+
+// File upload endpoint - extracts text from .txt or .pdf
+router.post('/upload', requireAuth(), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' })
+    }
+
+    const { originalname, buffer, mimetype } = req.file
+    let content = ''
+
+    if (mimetype === 'application/pdf' || originalname.endsWith('.pdf')) {
+      const pdfData = await pdf(buffer)
+      content = pdfData.text
+    } else if (mimetype === 'text/plain' || originalname.endsWith('.txt')) {
+      content = buffer.toString('utf-8')
+    } else {
+      return res.status(400).json({ error: 'Unsupported file type. Use .txt or .pdf' })
+    }
+
+    res.json({ 
+      filename: originalname,
+      content: content.trim()
+    })
+  } catch (error) {
+    console.error('File upload error:', error)
+    res.status(500).json({ error: 'Failed to parse file' })
+  }
+})
 
 router.get('/', requireAuth(), async (req, res) => {
   try {
@@ -56,7 +88,7 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
     console.log('Creating module with:', JSON.stringify(record, null, 2))
     const data = await createRecord('modules', record)
     console.log('Module created:', data)
-
+    
     // Update with QR code URL
     await updateRecord('modules', data.id, {
       [FIELDS.qr_code]: `https://clearproof.co.uk/verify/${data.id}`
