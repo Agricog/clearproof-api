@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requireAuth } from '@clerk/express'
 import multer from 'multer'
 import pdf from 'pdf-parse'
+import QRCode from 'qrcode'
 import { getRecords, getRecord, createRecord, updateRecord } from '../services/smartsuite.js'
 import { logAudit } from '../services/audit.js'
 import { validate } from '../middleware/validate.js'
@@ -58,6 +59,21 @@ router.post('/upload', requireAuth(), upload.single('file'), async (req, res) =>
   }
 })
 
+// Generate QR code image for a module
+router.get('/:id/qr', async (req, res) => {
+  try {
+    const verifyUrl = `https://clearproof.co.uk/verify/${req.params.id}`
+    const qrBuffer = await QRCode.toBuffer(verifyUrl)
+    
+    res.setHeader('Content-Type', 'image/png')
+    res.setHeader('Content-Disposition', `attachment; filename="qr-${req.params.id}.png"`)
+    res.send(qrBuffer)
+  } catch (error) {
+    console.error('QR generation error:', error)
+    res.status(500).json({ error: 'Failed to generate QR code' })
+  }
+})
+
 router.get('/', requireAuth(), async (req, res) => {
   try {
     const data = await getRecords('modules')
@@ -79,6 +95,15 @@ router.get('/', requireAuth(), async (req, res) => {
     })
     
     res.json({ items })
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+router.get('/:id', async (req, res) => {
+  try {
+    const data = await getRecord('modules', req.params.id)
+    res.json(data)
   } catch (error) {
     res.status(500).json({ error: String(error) })
   }
