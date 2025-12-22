@@ -4,6 +4,7 @@ import { getRecords, getRecord, createRecord } from '../services/smartsuite.js'
 import { logAudit } from '../services/audit.js'
 import { validate } from '../middleware/validate.js'
 import { createVerificationSchema } from '../schemas/index.js'
+import { verificationLimiter } from '../middleware/rateLimit.js'
 
 const router = Router()
 
@@ -101,8 +102,26 @@ router.get('/:id', requireAuth(), async (req, res) => {
   }
 })
 
-router.post('/', validate(createVerificationSchema), async (req, res) => {
+// Public endpoint - rate limited + honeypot protection
+router.post('/', verificationLimiter, validate(createVerificationSchema), async (req, res) => {
   try {
+    // Honeypot check - if this hidden field is filled, it's a bot
+    if (req.body.website || req.body.company_url) {
+      console.log('Bot detected via honeypot:', req.ip)
+      // Return success to not tip off the bot, but don't create record
+      return res.json({ id: 'blocked', success: true })
+    }
+
+    // Time-based check - if submission is too fast (< 10 seconds), likely a bot
+    const startTime = req.body._start_time
+    if (startTime) {
+      const elapsed = Date.now() - parseInt(startTime, 10)
+      if (elapsed < 10000) {
+        console.log('Bot detected via timing:', req.ip, elapsed)
+        return res.json({ id: 'blocked', success: true })
+      }
+    }
+
     const langCode = req.body.language_used || 'en'
     
     // 1. Create worker record first
