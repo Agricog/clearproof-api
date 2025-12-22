@@ -10,8 +10,8 @@ import { processLimiter } from '../middleware/rateLimit.js'
 
 const router = Router()
 
-// Claude has 30k token/min limit (~4 chars per token, minus prompt overhead)
-const MAX_CLAUDE_CHARS = 60000
+// Reduced limit to allow for 2 API calls per minute
+const MAX_CLAUDE_CHARS = 25000
 
 // Module field IDs
 const MODULE_FIELDS = {
@@ -24,6 +24,10 @@ const MODULE_FIELDS = {
 function truncateForClaude(content: string): string {
   if (content.length <= MAX_CLAUDE_CHARS) return content
   return content.substring(0, MAX_CLAUDE_CHARS) + '\n\n[Content truncated for processing]'
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 router.post('/transform/:moduleId', requireAuth(), processLimiter, async (req, res) => {
@@ -41,6 +45,11 @@ router.post('/transform/:moduleId', requireAuth(), processLimiter, async (req, r
     console.log(`Processing content: ${originalContent.length} chars, truncated to: ${truncatedContent.length} chars`)
 
     const processed = await transformContent(truncatedContent)
+    
+    // Wait 60 seconds to reset rate limit before generating questions
+    console.log('Waiting 60s for rate limit reset...')
+    await delay(60000)
+    
     const questions = await generateQuestions(processed, 'en')
     
     await updateRecord('modules', req.params.moduleId, {
