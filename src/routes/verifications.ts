@@ -28,6 +28,34 @@ const WORKER_FIELDS = {
   created_on: 's3cb92d18f'
 }
 
+// Language code to SmartSuite ID mapping - Verifications
+const VERIFICATION_LANG_IDS: Record<string, string> = {
+  'en': '6aUDS',
+  'pl': 'Muktb',
+  'ro': 'yRVjF',
+  'pt': 'r2HZE',
+  'uk': 'xD6t8',
+  'lt': 'ci01V',
+  'es': 'sDjl2',
+  'bg': 'uMhn2',
+  'hu': 'QBwLR',
+  'hi': 'C8izU'
+}
+
+// Language code to SmartSuite ID mapping - Workers
+const WORKER_LANG_IDS: Record<string, string> = {
+  'en': 'XC10L',
+  'pl': 'Tiq7v',
+  'ro': 'w1bw5',
+  'pt': '15JFJ',
+  'es': 'qTtdO',
+  'uk': 'BXLR5',
+  'lt': 'skKFJ',
+  'bg': '4w74b',
+  'hu': '1Qcep',
+  'hi': 'ibj9p'
+}
+
 router.get('/', requireAuth(), async (req, res) => {
   try {
     const data = await getRecords('verifications')
@@ -48,6 +76,8 @@ router.get('/:id', requireAuth(), async (req, res) => {
 
 router.post('/', validate(createVerificationSchema), async (req, res) => {
   try {
+    const langCode = req.body.language_used || 'en'
+    
     // 1. Create worker record first
     const workerRecord = {
       title: `${req.body.worker_name} - ${req.body.worker_id}`,
@@ -59,7 +89,7 @@ router.post('/', validate(createVerificationSchema), async (req, res) => {
         sys_root: req.body.worker_name || ''
       },
       [WORKER_FIELDS.worker_id]: req.body.worker_id || '',
-      [WORKER_FIELDS.preferred_language]: req.body.language_used || '',
+      [WORKER_FIELDS.preferred_language]: WORKER_LANG_IDS[langCode] || WORKER_LANG_IDS['en'],
       [WORKER_FIELDS.created_on]: {
         date: new Date().toISOString(),
         include_time: true
@@ -73,7 +103,7 @@ router.post('/', validate(createVerificationSchema), async (req, res) => {
       title: `${req.body.worker_name} - ${req.body.worker_id}`,
       [VERIFICATION_FIELDS.module]: req.body.module_id ? [req.body.module_id] : [],
       [VERIFICATION_FIELDS.worker]: [worker.id],
-      [VERIFICATION_FIELDS.language_used]: req.body.language_used || '',
+      [VERIFICATION_FIELDS.language_used]: VERIFICATION_LANG_IDS[langCode] || VERIFICATION_LANG_IDS['en'],
       [VERIFICATION_FIELDS.answers]: req.body.answers || '',
       [VERIFICATION_FIELDS.score]: req.body.score || 0,
       [VERIFICATION_FIELDS.completed_at]: {
