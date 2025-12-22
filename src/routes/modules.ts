@@ -61,16 +61,24 @@ router.post('/upload', requireAuth(), upload.single('file'), async (req, res) =>
 router.get('/', requireAuth(), async (req, res) => {
   try {
     const data = await getRecords('modules')
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ error: String(error) })
-  }
-})
-
-router.get('/:id', async (req, res) => {
-  try {
-    const data = await getRecord('modules', req.params.id)
-    res.json(data)
+    
+    // Map to friendly field names
+    const items = (data.items || []).map((m: Record<string, unknown>) => {
+      const createdOn = m[FIELDS.created_on] as { date?: string } | null
+      
+      return {
+        id: m.id,
+        title: m.title,
+        created_at: createdOn?.date || '',
+        original_content: m[FIELDS.original_content] || '',
+        processed_content: m[FIELDS.processed_content] || '',
+        questions: m[FIELDS.questions] || '',
+        qr_code: m[FIELDS.qr_code] || '',
+        status: (m.status as { value?: string })?.value || 'unknown'
+      }
+    })
+    
+    res.json({ items })
   } catch (error) {
     res.status(500).json({ error: String(error) })
   }
