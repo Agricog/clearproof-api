@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
 import { clerkMiddleware } from '@clerk/express'
 import { generalLimiter } from './middleware/rateLimit.js'
 import modulesRouter from './routes/modules.js'
@@ -16,6 +17,25 @@ const allowedOrigins = [
   'https://www.clearproof.co.uk'
 ]
 
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", ...allowedOrigins],
+      fontSrc: ["'self'", "https:", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"]
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}))
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -30,7 +50,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }))
 app.use(clerkMiddleware())
 app.use(generalLimiter)
-
 app.set('trust proxy', 1)
 
 app.use('/api/modules', modulesRouter)
