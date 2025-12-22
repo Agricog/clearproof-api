@@ -10,12 +10,20 @@ import { processLimiter } from '../middleware/rateLimit.js'
 
 const router = Router()
 
+// Claude has 30k token/min limit (~4 chars per token, minus prompt overhead)
+const MAX_CLAUDE_CHARS = 60000
+
 // Module field IDs
 const MODULE_FIELDS = {
   original_content: 'sbd46df988',
   processed_content: 'sde7e5250a',
   questions: 'sceb501715',
   qr_code: 's4ad3aec2f'
+}
+
+function truncateForClaude(content: string): string {
+  if (content.length <= MAX_CLAUDE_CHARS) return content
+  return content.substring(0, MAX_CLAUDE_CHARS) + '\n\n[Content truncated for processing]'
 }
 
 router.post('/transform/:moduleId', requireAuth(), processLimiter, async (req, res) => {
@@ -27,7 +35,12 @@ router.post('/transform/:moduleId', requireAuth(), processLimiter, async (req, r
       return res.status(400).json({ error: 'No content to process' })
     }
 
-    const processed = await transformContent(module[MODULE_FIELDS.original_content])
+    const originalContent = module[MODULE_FIELDS.original_content]
+    const truncatedContent = truncateForClaude(originalContent)
+    
+    console.log(`Processing content: ${originalContent.length} chars, truncated to: ${truncatedContent.length} chars`)
+
+    const processed = await transformContent(truncatedContent)
     const questions = await generateQuestions(processed, 'en')
     
     await updateRecord('modules', req.params.moduleId, {
@@ -55,7 +68,8 @@ router.post('/transform/:moduleId', requireAuth(), processLimiter, async (req, r
 router.post('/translate', validate(translateSchema), processLimiter, async (req, res) => {
   try {
     const { content, language } = req.body
-    const translated = await translateContent(content, language)
+    const truncatedContent = truncateForClaude(content)
+    const translated = await translateContent(truncatedContent, language)
 
     await logAudit({
       userId: null,
@@ -76,7 +90,8 @@ router.post('/translate', validate(translateSchema), processLimiter, async (req,
 router.post('/questions', validate(questionsSchema), processLimiter, async (req, res) => {
   try {
     const { content, language = 'en' } = req.body
-    const questions = await generateQuestions(content, language)
+    const truncatedContent = truncateForClaude(content)
+    const questions = await generateQuestions(truncatedContent, language)
     res.json({ questions })
   } catch (error) {
     console.error('Questions error:', error)
@@ -85,4 +100,3 @@ router.post('/questions', validate(questionsSchema), processLimiter, async (req,
 })
 
 export default router
-
