@@ -7,7 +7,7 @@ const TABLES = {
   workers: '69441f0deb5683351ec55a8f',
   verifications: '69441fd3d9350cee4e1b8e3e',
   audit_logs: '694440eb0dc34459d50511cd',
-  subscriptions: '694a8149fb3ea1cec1e47437'
+  subscriptions: '694a800d4600cad8ea882ff4'
 }
 
 async function request(endpoint: string, options: RequestInit = {}) {
