@@ -65,9 +65,3 @@ export async function deleteRecord(table: keyof typeof TABLES, id: string) {
 }
 
 export { TABLES }
-```
-
-Now add Stripe to your backend environment variables in Railway:
-```
-STRIPE_SECRET_KEY=sk_test_xxxxx (your secret key from Stripe dashboard)
-STRIPE_WEBHOOK_SECRET=whsec_xxxxx (we'll get this next)
