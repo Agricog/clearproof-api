@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import Stripe from 'stripe'
 import { requireAuth } from '@clerk/express'
 import { getUserId } from '../middleware/auth.js'
@@ -7,7 +7,7 @@ import { getRecords, createRecord, updateRecord } from '../services/smartsuite.j
 const router = Router()
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-11-20.acacia'
+  apiVersion: '2023-10-16'
 })
 
 const PRICES = {
@@ -23,6 +23,19 @@ const PLAN_LIMITS = {
   enterprise: { modules: 50, verifications: 2000 }
 }
 
+// SmartSuite field IDs for subscriptions table
+const FIELDS = {
+  userId: 's17078d555',
+  plan: 's437c90810',
+  status: 'se5cd99576',
+  stripeCustomerId: 's78d71e88c',
+  stripeSubscriptionId: 's27c292537',
+  currentPeriodEnd: 's57461e7d7',
+  modulesUsed: 's70770f153',
+  verificationsUsed: 's1072aea3a',
+  titles: 's6334d9c07'
+}
+
 // Get subscription status for current user
 router.get('/subscription', requireAuth(), async (req, res) => {
   try {
@@ -30,7 +43,7 @@ router.get('/subscription', requireAuth(), async (req, res) => {
     
     const data = await getRecords('subscriptions')
     const subscription = (data.items || []).find(
-      (s: Record<string, unknown>) => s.sf8a3b2c1d === userId
+      (s: Record<string, unknown>) => s[FIELDS.userId] === userId
     )
     
     if (!subscription) {
@@ -42,17 +55,17 @@ router.get('/subscription', requireAuth(), async (req, res) => {
       })
     }
     
-    const plan = (subscription.s1a2b3c4d5 as string) || 'free'
+    const plan = (subscription[FIELDS.plan] as string) || 'free'
     
     res.json({
       plan,
-      status: subscription.s2b3c4d5e6 || 'active',
-      stripeCustomerId: subscription.s3c4d5e6f7,
-      currentPeriodEnd: subscription.s5e6f7g8h9,
+      status: subscription[FIELDS.status] || 'active',
+      stripeCustomerId: subscription[FIELDS.stripeCustomerId],
+      currentPeriodEnd: subscription[FIELDS.currentPeriodEnd],
       limits: PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free,
       usage: {
-        modules: subscription.s6f7g8h9i0 || 0,
-        verifications: subscription.s7g8h9i0j1 || 0
+        modules: subscription[FIELDS.modulesUsed] || 0,
+        verifications: subscription[FIELDS.verificationsUsed] || 0
       }
     })
   } catch (error) {
@@ -74,10 +87,10 @@ router.post('/checkout', requireAuth(), async (req, res) => {
     // Check for existing customer
     const data = await getRecords('subscriptions')
     const existing = (data.items || []).find(
-      (s: Record<string, unknown>) => s.sf8a3b2c1d === userId
+      (s: Record<string, unknown>) => s[FIELDS.userId] === userId
     )
     
-    let customerId = existing?.s3c4d5e6f7 as string | undefined
+    let customerId = existing?.[FIELDS.stripeCustomerId] as string | undefined
     
     // Create new customer if needed
     if (!customerId) {
@@ -115,15 +128,15 @@ router.post('/portal', requireAuth(), async (req, res) => {
     
     const data = await getRecords('subscriptions')
     const subscription = (data.items || []).find(
-      (s: Record<string, unknown>) => s.sf8a3b2c1d === userId
+      (s: Record<string, unknown>) => s[FIELDS.userId] === userId
     )
     
-    if (!subscription?.s3c4d5e6f7) {
+    if (!subscription?.[FIELDS.stripeCustomerId]) {
       return res.status(400).json({ error: 'No subscription found' })
     }
     
     const session = await stripe.billingPortal.sessions.create({
-      customer: subscription.s3c4d5e6f7 as string,
+      customer: subscription[FIELDS.stripeCustomerId] as string,
       return_url: 'https://clearproof.co.uk/dashboard'
     })
     
@@ -134,8 +147,8 @@ router.post('/portal', requireAuth(), async (req, res) => {
   }
 })
 
-// Stripe webhook
-router.post('/webhook', async (req, res) => {
+// Stripe webhook handler (exported separately for raw body parsing)
+export async function stripeWebhook(req: Request, res: Response) {
   const sig = req.headers['stripe-signature'] as string
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
   
@@ -156,21 +169,21 @@ router.post('/webhook', async (req, res) => {
         const plan = session.metadata?.plan
         
         if (userId && plan) {
-          // Check if subscription record exists
           const data = await getRecords('subscriptions')
           const existing = (data.items || []).find(
-            (s: Record<string, unknown>) => s.sf8a3b2c1d === userId
+            (s: Record<string, unknown>) => s[FIELDS.userId] === userId
           )
           
           const subscriptionData = {
-            title: `${plan} - ${userId}`,
-            sf8a3b2c1d: userId,
-            s1a2b3c4d5: plan,
-            s2b3c4d5e6: 'active',
-            s3c4d5e6f7: session.customer as string,
-            s4d5e6f7g8: session.subscription as string,
-            s6f7g8h9i0: 0,
-            s7g8h9i0j1: 0
+            title: `${plan} - ${userId.slice(0, 8)}`,
+            [FIELDS.titles]: `${plan} subscription`,
+            [FIELDS.userId]: userId,
+            [FIELDS.plan]: plan,
+            [FIELDS.status]: 'active',
+            [FIELDS.stripeCustomerId]: session.customer as string,
+            [FIELDS.stripeSubscriptionId]: session.subscription as string,
+            [FIELDS.modulesUsed]: 0,
+            [FIELDS.verificationsUsed]: 0
           }
           
           if (existing) {
@@ -186,14 +199,12 @@ router.post('/webhook', async (req, res) => {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = subscription.customer as string
         
-        // Find subscription by customer ID
         const data = await getRecords('subscriptions')
         const existing = (data.items || []).find(
-          (s: Record<string, unknown>) => s.s3c4d5e6f7 === customerId
+          (s: Record<string, unknown>) => s[FIELDS.stripeCustomerId] === customerId
         )
         
         if (existing) {
-          // Determine plan from price
           const priceId = subscription.items.data[0]?.price.id
           let plan = 'free'
           if (priceId === PRICES.starter) plan = 'starter'
@@ -201,9 +212,9 @@ router.post('/webhook', async (req, res) => {
           else if (priceId === PRICES.enterprise) plan = 'enterprise'
           
           await updateRecord('subscriptions', existing.id as string, {
-            s1a2b3c4d5: plan,
-            s2b3c4d5e6: subscription.status,
-            s5e6f7g8h9: new Date(subscription.current_period_end * 1000).toISOString()
+            [FIELDS.plan]: plan,
+            [FIELDS.status]: subscription.status,
+            [FIELDS.currentPeriodEnd]: new Date(subscription.current_period_end * 1000).toISOString()
           })
         }
         break
@@ -215,13 +226,30 @@ router.post('/webhook', async (req, res) => {
         
         const data = await getRecords('subscriptions')
         const existing = (data.items || []).find(
-          (s: Record<string, unknown>) => s.s3c4d5e6f7 === customerId
+          (s: Record<string, unknown>) => s[FIELDS.stripeCustomerId] === customerId
         )
         
         if (existing) {
           await updateRecord('subscriptions', existing.id as string, {
-            s1a2b3c4d5: 'free',
-            s2b3c4d5e6: 'cancelled'
+            [FIELDS.plan]: 'free',
+            [FIELDS.status]: 'cancelled'
+          })
+        }
+        break
+      }
+      
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        const customerId = invoice.customer as string
+        
+        const data = await getRecords('subscriptions')
+        const existing = (data.items || []).find(
+          (s: Record<string, unknown>) => s[FIELDS.stripeCustomerId] === customerId
+        )
+        
+        if (existing) {
+          await updateRecord('subscriptions', existing.id as string, {
+            [FIELDS.status]: 'past_due'
           })
         }
         break
@@ -233,6 +261,6 @@ router.post('/webhook', async (req, res) => {
     console.error('Webhook processing error:', error)
     res.status(500).json({ error: 'Webhook processing failed' })
   }
-})
+}
 
 export default router
