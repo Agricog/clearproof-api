@@ -193,7 +193,7 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
       action: 'module.create',
       resource: 'modules',
       resourceId: data.id,
-      ip: req.ip || null,
+      ip: req.ip || '',
       details: { title: req.body.title }
     })
     
@@ -230,7 +230,7 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
       action: 'module.update',
       resource: 'modules',
       resourceId: req.params.id,
-      ip: req.ip || null,
+      ip: req.ip || '',
       details: req.body
     })
     
@@ -254,7 +254,7 @@ router.delete('/:id', requireAuth(), async (req, res) => {
       action: 'module.delete',
       resource: 'modules',
       resourceId: req.params.id,
-      ip: req.ip || null,
+      ip: req.ip || '',
       details: { title: module.title }
     })
     
