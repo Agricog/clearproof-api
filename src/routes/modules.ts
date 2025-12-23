@@ -139,7 +139,6 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) => {
   try {
     const userId = getUserId(req)
-    const clientIp = String(req.ip || '')
     
     const limitCheck = await checkModuleLimit(userId)
     if (!limitCheck.allowed) {
@@ -182,7 +181,7 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
       action: 'module.create',
       resource: 'modules',
       resourceId: data.id,
-      ip: clientIp,
+      ip: req.ip,
       details: { title: req.body.title }
     })
     
@@ -196,7 +195,6 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
 router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, res) => {
   try {
     const userId = getUserId(req)
-    const clientIp = String(req.ip || '')
     
     const record: Record<string, unknown> = {}
     if (req.body.title) record.title = req.body.title
@@ -219,7 +217,7 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
       action: 'module.update',
       resource: 'modules',
       resourceId: req.params.id,
-      ip: clientIp,
+      ip: req.ip,
       details: req.body
     })
     
@@ -232,7 +230,6 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
 router.delete('/:id', requireAuth(), async (req, res) => {
   try {
     const userId = getUserId(req)
-    const clientIp = String(req.ip || '')
     
     const module = await getRecord('modules', req.params.id)
     
@@ -243,7 +240,7 @@ router.delete('/:id', requireAuth(), async (req, res) => {
       action: 'module.delete',
       resource: 'modules',
       resourceId: req.params.id,
-      ip: clientIp,
+      ip: req.ip,
       details: { title: module.title }
     })
     
