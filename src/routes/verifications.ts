@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { requireAuth } from '@clerk/express'
-import { getRecords, getRecord, createRecord } from '../services/smartsuite.js'
+import { getRecords, getRecord, createRecord, updateRecord } from '../services/smartsuite.js'
 import { logAudit } from '../services/audit.js'
 import { validate } from '../middleware/validate.js'
 import { createVerificationSchema } from '../schemas/index.js'
@@ -29,6 +29,20 @@ const WORKER_FIELDS = {
   created_on: 's3cb92d18f'
 }
 
+// Subscription field IDs
+const SUB_FIELDS = {
+  userId: 's17078d555',
+  plan: 's437c90810',
+  verificationsUsed: 's1072aea3a'
+}
+
+const PLAN_LIMITS = {
+  free: { modules: 1, verifications: 10 },
+  starter: { modules: 5, verifications: 100 },
+  professional: { modules: 20, verifications: 500 },
+  enterprise: { modules: 50, verifications: 2000 }
+}
+
 // Language code to SmartSuite ID mapping - Verifications
 const VERIFICATION_LANG_IDS: Record<string, string> = {
   'en': '6aUDS',
@@ -55,6 +69,48 @@ const WORKER_LANG_IDS: Record<string, string> = {
   'bg': '4w74b',
   'hu': '1Qcep',
   'hi': 'ibj9p'
+}
+
+// Check verification limit and get subscription
+async function checkVerificationLimit(): Promise<{ 
+  allowed: boolean
+  current: number
+  limit: number
+  subscriptionId: string | null
+}> {
+  // Get the first subscription (single-tenant for now)
+  const subData = await getRecords('subscriptions')
+  const subscription = (subData.items || [])[0]
+  
+  if (!subscription) {
+    // No subscription = free tier
+    const verificationsData = await getRecords('verifications')
+    const currentCount = (verificationsData.items || []).length
+    return {
+      allowed: currentCount < PLAN_LIMITS.free.verifications,
+      current: currentCount,
+      limit: PLAN_LIMITS.free.verifications,
+      subscriptionId: null
+    }
+  }
+  
+  const plan = (subscription[SUB_FIELDS.plan] as string) || 'free'
+  const limit = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS]?.verifications || 10
+  const currentUsed = (subscription[SUB_FIELDS.verificationsUsed] as number) || 0
+  
+  return {
+    allowed: currentUsed < limit,
+    current: currentUsed,
+    limit,
+    subscriptionId: subscription.id as string
+  }
+}
+
+// Increment verification usage
+async function incrementVerificationUsage(subscriptionId: string, currentCount: number) {
+  await updateRecord('subscriptions', subscriptionId, {
+    [SUB_FIELDS.verificationsUsed]: currentCount + 1
+  })
 }
 
 router.get('/', requireAuth(), async (req, res) => {
@@ -122,6 +178,17 @@ router.post('/', verificationLimiter, validate(createVerificationSchema), async 
       }
     }
 
+    // Check verification limit
+    const limitCheck = await checkVerificationLimit()
+    if (!limitCheck.allowed) {
+      return res.status(403).json({
+        error: 'Verification limit reached',
+        message: 'This account has reached their monthly verification limit. Please contact the site manager.',
+        current: limitCheck.current,
+        limit: limitCheck.limit
+      })
+    }
+
     const langCode = req.body.language_used || 'en'
     
     // 1. Create worker record first
@@ -160,6 +227,11 @@ router.post('/', verificationLimiter, validate(createVerificationSchema), async 
     }
 
     const verification = await createRecord('verifications', verificationRecord)
+
+    // 3. Increment verification usage
+    if (limitCheck.subscriptionId) {
+      await incrementVerificationUsage(limitCheck.subscriptionId, limitCheck.current)
+    }
 
     await logAudit({
       userId: null,
