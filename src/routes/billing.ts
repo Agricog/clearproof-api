@@ -225,7 +225,9 @@ export async function stripeWebhook(req: Request, res: Response) {
             [FIELDS.status]: subscription.status,
             [FIELDS.stripeCustomerId]: customerId,
             [FIELDS.stripeSubscriptionId]: subscription.id,
-            [FIELDS.currentPeriodEnd]: new Date(subscription.current_period_end * 1000).toISOString(),
+            [FIELDS.currentPeriodEnd]: subscription.current_period_end 
+          ? new Date(subscription.current_period_end * 1000).toISOString() 
+          : null,
             [FIELDS.modulesUsed]: 0,
             [FIELDS.verificationsUsed]: 0
           }
