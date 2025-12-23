@@ -23,7 +23,6 @@ const PLAN_LIMITS = {
   enterprise: { modules: 50, verifications: 2000 }
 }
 
-// SmartSuite field IDs for subscriptions table
 const FIELDS = {
   userId: 's17078d555',
   plan: 's437c90810',
@@ -36,7 +35,6 @@ const FIELDS = {
   titles: 's6334d9c07'
 }
 
-// Get subscription status for current user
 router.get('/subscription', requireAuth(), async (req, res) => {
   try {
     const userId = getUserId(req)
@@ -74,7 +72,6 @@ router.get('/subscription', requireAuth(), async (req, res) => {
   }
 })
 
-// Create checkout session
 router.post('/checkout', requireAuth(), async (req, res) => {
   try {
     const userId = getUserId(req)
@@ -84,7 +81,6 @@ router.post('/checkout', requireAuth(), async (req, res) => {
       return res.status(400).json({ error: 'Invalid plan' })
     }
     
-    // Check for existing customer
     const data = await getRecords('subscriptions')
     const existing = (data.items || []).find(
       (s: Record<string, unknown>) => s[FIELDS.userId] === userId
@@ -92,7 +88,6 @@ router.post('/checkout', requireAuth(), async (req, res) => {
     
     let customerId = existing?.[FIELDS.stripeCustomerId] as string | undefined
     
-    // Create new customer if needed
     if (!customerId) {
       const customer = await stripe.customers.create({
         email,
@@ -109,8 +104,8 @@ router.post('/checkout', requireAuth(), async (req, res) => {
         quantity: 1
       }],
       mode: 'subscription',
-      success_url: `https://clearproof.co.uk/dashboard?checkout=success`,
-      cancel_url: `https://clearproof.co.uk/pricing?checkout=cancelled`,
+      success_url: 'https://clearproof.co.uk/dashboard?checkout=success',
+      cancel_url: 'https://clearproof.co.uk/pricing?checkout=cancelled',
       metadata: { userId, plan }
     })
     
@@ -121,7 +116,6 @@ router.post('/checkout', requireAuth(), async (req, res) => {
   }
 })
 
-// Customer portal for managing subscription
 router.post('/portal', requireAuth(), async (req, res) => {
   try {
     const userId = getUserId(req)
@@ -147,7 +141,6 @@ router.post('/portal', requireAuth(), async (req, res) => {
   }
 })
 
-// Stripe webhook handler (exported separately for raw body parsing)
 export async function stripeWebhook(req: Request, res: Response) {
   const sig = req.headers['stripe-signature'] as string
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
