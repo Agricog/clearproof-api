@@ -34,7 +34,7 @@ const PLAN_LIMITS = {
   enterprise: { modules: 50, verifications: 2000 }
 }
 
-async function checkModuleLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number }> {
+async function checkModuleLimit(userId: string | null): Promise<{ allowed: boolean; current: number; limit: number }> {
   const subData = await getRecords('subscriptions')
   const subscription = (subData.items || []).find(
     (s: Record<string, unknown>) => s[SUB_FIELDS.userId] === userId
