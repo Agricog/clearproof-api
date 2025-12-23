@@ -11,7 +11,6 @@ import { getUserId } from '../middleware/auth.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
-
 const MAX_CONTENT_LENGTH = 100000
 
 // Field ID mapping
@@ -21,6 +20,42 @@ const FIELDS = {
   questions: 'sceb501715',
   qr_code: 's4ad3aec2f',
   created_on: 'sc8d4acbb6'
+}
+
+// Subscription field IDs
+const SUB_FIELDS = {
+  userId: 's17078d555',
+  plan: 's437c90810',
+  modulesUsed: 's70770f153'
+}
+
+const PLAN_LIMITS = {
+  free: { modules: 1, verifications: 10 },
+  starter: { modules: 5, verifications: 100 },
+  professional: { modules: 20, verifications: 500 },
+  enterprise: { modules: 50, verifications: 2000 }
+}
+
+// Check module limit for user
+async function checkModuleLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number }> {
+  // Get user's subscription
+  const subData = await getRecords('subscriptions')
+  const subscription = (subData.items || []).find(
+    (s: Record<string, unknown>) => s[SUB_FIELDS.userId] === userId
+  )
+  
+  const plan = (subscription?.[SUB_FIELDS.plan] as string) || 'free'
+  const limit = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS]?.modules || 1
+  
+  // Count user's current modules
+  const modulesData = await getRecords('modules')
+  const currentCount = (modulesData.items || []).length
+  
+  return {
+    allowed: currentCount < limit,
+    current: currentCount,
+    limit
+  }
 }
 
 // File upload endpoint - extracts text from .txt or .pdf
@@ -112,6 +147,17 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) => {
   try {
     const userId = getUserId(req)
+    
+    // Check module limit
+    const limitCheck = await checkModuleLimit(userId)
+    if (!limitCheck.allowed) {
+      return res.status(403).json({ 
+        error: 'Module limit reached',
+        message: `You have reached your plan limit of ${limitCheck.limit} modules. Please upgrade to add more.`,
+        current: limitCheck.current,
+        limit: limitCheck.limit
+      })
+    }
     
     // Truncate content to SmartSuite's limit
     let originalContent = req.body.original_content || ''
