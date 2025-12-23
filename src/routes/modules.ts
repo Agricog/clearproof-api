@@ -13,7 +13,6 @@ const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
 const MAX_CONTENT_LENGTH = 100000
 
-// Field ID mapping
 const FIELDS = {
   original_content: 'sbd46df988',
   processed_content: 'sde7e5250a',
@@ -22,7 +21,6 @@ const FIELDS = {
   created_on: 'sc8d4acbb6'
 }
 
-// Subscription field IDs
 const SUB_FIELDS = {
   userId: 's17078d555',
   plan: 's437c90810',
@@ -36,9 +34,7 @@ const PLAN_LIMITS = {
   enterprise: { modules: 50, verifications: 2000 }
 }
 
-// Check module limit for user
 async function checkModuleLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number }> {
-  // Get user's subscription
   const subData = await getRecords('subscriptions')
   const subscription = (subData.items || []).find(
     (s: Record<string, unknown>) => s[SUB_FIELDS.userId] === userId
@@ -47,7 +43,6 @@ async function checkModuleLimit(userId: string): Promise<{ allowed: boolean; cur
   const plan = (subscription?.[SUB_FIELDS.plan] as string) || 'free'
   const limit = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS]?.modules || 1
   
-  // Count user's current modules
   const modulesData = await getRecords('modules')
   const currentCount = (modulesData.items || []).length
   
@@ -58,7 +53,6 @@ async function checkModuleLimit(userId: string): Promise<{ allowed: boolean; cur
   }
 }
 
-// File upload endpoint - extracts text from .txt or .pdf
 router.post('/upload', requireAuth(), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -94,7 +88,6 @@ router.post('/upload', requireAuth(), upload.single('file'), async (req, res) =>
   }
 })
 
-// Generate QR code image for a module
 router.get('/:id/qr', async (req, res) => {
   try {
     const verifyUrl = `https://clearproof.co.uk/verify/${req.params.id}`
@@ -113,7 +106,6 @@ router.get('/', requireAuth(), async (req, res) => {
   try {
     const data = await getRecords('modules')
     
-    // Map to friendly field names
     const items = (data.items || []).map((m: Record<string, unknown>) => {
       const createdOn = m[FIELDS.created_on] as { date?: string } | null
       
@@ -147,9 +139,8 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) => {
   try {
     const userId = getUserId(req)
-    const clientIp = req.ip ?? req.socket.remoteAddress ?? ''
+    const clientIp: string = req.ip || req.socket?.remoteAddress || ''
     
-    // Check module limit
     const limitCheck = await checkModuleLimit(userId)
     if (!limitCheck.allowed) {
       return res.status(403).json({ 
@@ -160,13 +151,11 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
       })
     }
     
-    // Truncate content to SmartSuite's limit
     let originalContent = req.body.original_content || ''
     if (originalContent.length > MAX_CONTENT_LENGTH) {
       originalContent = originalContent.substring(0, MAX_CONTENT_LENGTH) + '\n\n[Content truncated]'
     }
     
-    // Map to SmartSuite field IDs
     const record = {
       title: req.body.title,
       [FIELDS.original_content]: originalContent,
@@ -184,7 +173,6 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
     const data = await createRecord('modules', record)
     console.log('Module created:', data.id)
     
-    // Update with QR code URL
     await updateRecord('modules', data.id, {
       [FIELDS.qr_code]: `https://clearproof.co.uk/verify/${data.id}`
     })
@@ -208,9 +196,8 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
 router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, res) => {
   try {
     const userId = getUserId(req)
-    const clientIp = req.ip ?? req.socket.remoteAddress ?? ''
+    const clientIp: string = req.ip || req.socket?.remoteAddress || ''
     
-    // Map fields to SmartSuite IDs
     const record: Record<string, unknown> = {}
     if (req.body.title) record.title = req.body.title
     if (req.body.original_content) {
@@ -245,9 +232,8 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
 router.delete('/:id', requireAuth(), async (req, res) => {
   try {
     const userId = getUserId(req)
-    const clientIp = req.ip ?? req.socket.remoteAddress ?? ''
+    const clientIp: string = req.ip || req.socket?.remoteAddress || ''
     
-    // Get module title for audit log before deleting
     const module = await getRecord('modules', req.params.id)
     
     await deleteRecord('modules', req.params.id)
