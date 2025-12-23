@@ -147,6 +147,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) => {
   try {
     const userId = getUserId(req)
+    const clientIp = req.ip ?? req.socket.remoteAddress ?? ''
     
     // Check module limit
     const limitCheck = await checkModuleLimit(userId)
@@ -193,7 +194,7 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
       action: 'module.create',
       resource: 'modules',
       resourceId: data.id,
-      ip: req.ip || '',
+      ip: clientIp,
       details: { title: req.body.title }
     })
     
@@ -207,6 +208,7 @@ router.post('/', requireAuth(), validate(createModuleSchema), async (req, res) =
 router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, res) => {
   try {
     const userId = getUserId(req)
+    const clientIp = req.ip ?? req.socket.remoteAddress ?? ''
     
     // Map fields to SmartSuite IDs
     const record: Record<string, unknown> = {}
@@ -230,7 +232,7 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
       action: 'module.update',
       resource: 'modules',
       resourceId: req.params.id,
-      ip: req.ip || '',
+      ip: clientIp,
       details: req.body
     })
     
@@ -243,6 +245,7 @@ router.patch('/:id', requireAuth(), validate(updateModuleSchema), async (req, re
 router.delete('/:id', requireAuth(), async (req, res) => {
   try {
     const userId = getUserId(req)
+    const clientIp = req.ip ?? req.socket.remoteAddress ?? ''
     
     // Get module title for audit log before deleting
     const module = await getRecord('modules', req.params.id)
@@ -254,7 +257,7 @@ router.delete('/:id', requireAuth(), async (req, res) => {
       action: 'module.delete',
       resource: 'modules',
       resourceId: req.params.id,
-      ip: req.ip || '',
+      ip: clientIp,
       details: { title: module.title }
     })
     
