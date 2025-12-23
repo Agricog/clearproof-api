@@ -154,12 +154,16 @@ export async function stripeWebhook(req: Request, res: Response) {
     return res.status(400).send('Webhook signature verification failed')
   }
   
+  console.log('Webhook received:', event.type)
+  
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         const userId = session.metadata?.userId
         const plan = session.metadata?.plan
+        
+        console.log('Checkout completed:', { userId, plan })
         
         if (userId && plan) {
           const data = await getRecords('subscriptions')
@@ -184,6 +188,54 @@ export async function stripeWebhook(req: Request, res: Response) {
           } else {
             await createRecord('subscriptions', subscriptionData)
           }
+          console.log('Subscription record created/updated')
+        }
+        break
+      }
+      
+      case 'customer.subscription.created': {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
+        
+        console.log('Subscription created for customer:', customerId)
+        
+        // Get customer to find userId from metadata
+        const customer = await stripe.customers.retrieve(customerId)
+        const userId = (customer as Stripe.Customer).metadata?.userId
+        
+        if (userId) {
+          const priceId = subscription.items.data[0]?.price.id
+          let plan = 'free'
+          if (priceId === PRICES.starter) plan = 'starter'
+          else if (priceId === PRICES.professional) plan = 'professional'
+          else if (priceId === PRICES.enterprise) plan = 'enterprise'
+          
+          console.log('Creating subscription for user:', { userId, plan })
+          
+          const data = await getRecords('subscriptions')
+          const existing = (data.items || []).find(
+            (s: Record<string, unknown>) => s[FIELDS.userId] === userId
+          )
+          
+          const subscriptionData = {
+            title: `${plan} - ${userId.slice(0, 8)}`,
+            [FIELDS.titles]: `${plan} subscription`,
+            [FIELDS.userId]: userId,
+            [FIELDS.plan]: plan,
+            [FIELDS.status]: subscription.status,
+            [FIELDS.stripeCustomerId]: customerId,
+            [FIELDS.stripeSubscriptionId]: subscription.id,
+            [FIELDS.currentPeriodEnd]: new Date(subscription.current_period_end * 1000).toISOString(),
+            [FIELDS.modulesUsed]: 0,
+            [FIELDS.verificationsUsed]: 0
+          }
+          
+          if (existing) {
+            await updateRecord('subscriptions', existing.id as string, subscriptionData)
+          } else {
+            await createRecord('subscriptions', subscriptionData)
+          }
+          console.log('Subscription record created/updated from subscription.created')
         }
         break
       }
